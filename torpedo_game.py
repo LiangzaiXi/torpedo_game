@@ -73,12 +73,18 @@ class Scout(Ship):
         )
 
 
+class Destroyer(Ship):
+    def __init__(self):
+        super().__init__("駆逐艦", "D", 1, 3, ("torpedo", "cross", "depth_charge"))
+
+
 SHIP_TYPES = {
     "1": AttackSubmarine,
     "2": StandardSubmarine,
     "3": NuclearSubmarine,
     "4": Carrier,
     "5": Scout,
+    "6": Destroyer,
 }
 
 
@@ -413,8 +419,8 @@ def show_boards(player, enemy, player_shots, cpu_shots, turn, reveal_enemy=False
 
 def choose_fleet(size=SIZE):
     print("\n--- 艦隊編成 ---")
-    print(f"艦種は全5種類。{size}×{size}の海域に2〜3隻を選択できます。")
-    print("同じ艦種を複数選んでもOKです（例: 2 2 5）。")
+    print(f"艦種は全6種類。{size}×{size}の海域に2〜3隻を選択できます。")
+    print("同じ艦種を複数選んでもOKです（例: 2 2 6）。")
     for k, ctor in SHIP_TYPES.items():
         s = ctor()
         print(
@@ -423,7 +429,7 @@ def choose_fleet(size=SIZE):
     print("※空母・偵察機は攻撃能力なし。通常レーダーは両艦とも無制限です。")
     print("※支援艦だけの編成も選択できますが、攻撃不能のため戦闘開始時に敗北します。")
     while True:
-        s = input("5種類から2〜3隻の番号を空白区切りで入力 (例: 1 4 5): ").strip()
+        s = input("6種類から2〜3隻の番号を空白区切りで入力 (例: 1 4 6): ").strip()
         if s.lower() == "q":
             raise KeyboardInterrupt
         values = s.split()
@@ -435,7 +441,7 @@ def choose_fleet(size=SIZE):
                 f"この艦隊は{size}×{size}の海域に配置できません。別の編成を選んでください。"
             )
             continue
-        print("番号1〜5の中から、2〜3隻を選んでください。")
+        print("番号1〜6の中から、2〜3隻を選んでください。")
 
 
 def try_place_all(fleet, rng):
@@ -603,8 +609,15 @@ def make_debug_enemy_fleet(size):
 
 
 def make_cpu_fleet(rng, size=SIZE):
-    pool = [AttackSubmarine, StandardSubmarine, NuclearSubmarine, Carrier, Scout]
-    classes = [rng.choice(pool[:3]), rng.choice(pool), rng.choice(pool)]
+    pool = [
+        AttackSubmarine,
+        StandardSubmarine,
+        NuclearSubmarine,
+        Destroyer,
+        Carrier,
+        Scout,
+    ]
+    classes = [rng.choice(pool[:4]), rng.choice(pool), rng.choice(pool)]
     fleet = Fleet([c() for c in classes], size)
     fleet.random_place_all(rng)
     return fleet
@@ -612,7 +625,7 @@ def make_cpu_fleet(rng, size=SIZE):
 
 def run_game(rng, animations=True, auto_demo=False, debug_size=None):
     if auto_demo:
-        player = Fleet([AttackSubmarine(), StandardSubmarine(), Carrier()])
+        player = Fleet([AttackSubmarine(), StandardSubmarine(), Destroyer()])
         player.random_place_all(rng)
     else:
         print("\n========== FLEET COMMAND / 魚雷ゲーム ==========")
@@ -622,7 +635,7 @@ def run_game(rng, animations=True, auto_demo=False, debug_size=None):
             print("命中やレーダーの検証用です。通常モードとはルールが異なります。")
         else:
             print(
-                "5種類の艦種から2〜3隻を選んで9x9の海域に配置。敵艦隊の編成は公開、位置は秘密です。"
+                "6種類の艦種から2〜3隻を選んで9x9の海域に配置。敵艦隊の編成は公開、位置は秘密です。"
             )
         print("命中X / 外れo / 至近弾? （周囲8マス以内に艦影あり）")
         player = Fleet(choose_fleet(size), size)
