@@ -277,10 +277,11 @@ class Fleet:
 
 
 class CPU:
-    def __init__(self, rng, size=SIZE):
-        self.rng, self.size = rng, size
+    def __init__(self, rng, size=SIZE, hard=False):
+        self.rng, self.size, self.hard = rng, size, hard
         self.tried = set()
         self.priority = deque()
+        self.hit_history = []
 
     def choose_target(self):
         while self.priority:
@@ -294,6 +295,10 @@ class CPU:
             for x in range(self.size)
             if (x, y) not in self.tried
         ]
+        if self.hard:
+            checker = [p for p in remaining if (p[0] + p[1]) % 2 == 0]
+            if checker:
+                remaining = checker
         if not remaining:
             return None
         p = self.rng.choice(remaining)
@@ -301,7 +306,32 @@ class CPU:
         return p
 
     def feedback(self, p, result):
-        if result in ("hit", "near"):
+        if result == "sunk":
+            self.hit_history.clear()
+            self.priority.clear()
+            return
+        if result == "hit":
+            self.hit_history.append(p)
+            if self.hard and len(self.hit_history) >= 2:
+                prev = self.hit_history[-2]
+                dx, dy = p[0] - prev[0], p[1] - prev[1]
+                if (dx, dy) in DIRECTIONS:
+                    line_targets = [
+                        (p[0] + dx, p[1] + dy),
+                        (prev[0] - dx, prev[1] - dy),
+                    ]
+                    for t in line_targets:
+                        if in_bounds(t, self.size) and t not in self.tried:
+                            self.priority.appendleft(t)
+                    return
+            offsets = DIRECTIONS if self.hard else NEIGHBORS
+            candidates = [(p[0] + dx, p[1] + dy) for dx, dy in offsets]
+            self.rng.shuffle(candidates)
+            if self.hard:
+                self.priority.extendleft(candidates)
+            else:
+                self.priority.extend(candidates)
+        elif result == "near":
             candidates = [(p[0] + dx, p[1] + dy) for dx, dy in NEIGHBORS]
             self.rng.shuffle(candidates)
             self.priority.extend(candidates)
@@ -623,7 +653,7 @@ def make_cpu_fleet(rng, size=SIZE):
     return fleet
 
 
-def run_game(rng, animations=True, auto_demo=False, debug_size=None):
+def run_game(rng, animations=True, auto_demo=False, debug_size=None, hard_cpu=False):
     if auto_demo:
         player = Fleet([AttackSubmarine(), StandardSubmarine(), Destroyer()])
         player.random_place_all(rng)
@@ -634,8 +664,13 @@ def run_game(rng, animations=True, auto_demo=False, debug_size=None):
             print(f"【DEBUG {size}×{size}】敵の艦影を公開／固定配置／敵の反撃なし。")
             print("命中やレーダーの検証用です。通常モードとはルールが異なります。")
         else:
+            mode_input = (
+                input("CPU難易度 [n: 通常 / h: 難しい] (Enterで通常): ").strip().lower()
+            )
+            if mode_input == "h":
+                hard_cpu = True
             print(
-                "6種類の艦種から2〜3隻を選んで9x9の海域に配置。敵艦隊の編成は公開、位置は秘密です。"
+                f'6種類の艦種から2〜3隻を選んで9x9の海域に配置（CPU: {"難しい" if hard_cpu else "通常"}）。'
             )
         print("命中X / 外れo / 至近弾? （周囲8マス以内に艦影あり）")
         player = Fleet(choose_fleet(size), size)
@@ -643,7 +678,7 @@ def run_game(rng, animations=True, auto_demo=False, debug_size=None):
     enemy = make_debug_enemy_fleet(debug_size) if debug_size else make_cpu_fleet(rng)
     animation(DEPARTURE, animations)
     player_shots, cpu_shots = {}, {}
-    cpu = CPU(rng, player.size)
+    cpu = CPU(rng, player.size, hard=hard_cpu)
     turn = 0
     if not player.has_offense():
         print("この艦隊には攻撃手段がありません。出撃しましたが戦闘不能で敗北です。")
@@ -713,6 +748,7 @@ def main():
         "--no-animations", action="store_true", help="演出の待ち時間を省く"
     )
     parser.add_argument("--demo", action="store_true", help="自動対戦で動作確認する")
+    parser.add_argument("--hard", action="store_true", help="CPUをハードモードにする")
     parser.add_argument(
         "--debug",
         type=int,
@@ -731,6 +767,7 @@ def main():
                 animations=not args.no_animations and not args.demo,
                 auto_demo=args.demo,
                 debug_size=args.debug,
+                hard_cpu=args.hard,
             )
             if args.demo:
                 print("DEMO RESULT:", outcome)
