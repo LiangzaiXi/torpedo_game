@@ -66,7 +66,7 @@ python torpedo_game.py --seed 42          # 乱数シードを固定して実行
 
 ## スクリーンショット
 
-![ゲームの実行画面](images/screenshot.png)
+![ゲームの実行画面]
 
 ## 既知の問題・制限事項
 
